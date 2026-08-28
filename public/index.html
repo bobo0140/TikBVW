@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TikBVW — Контролна зала</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ================= ЛЯВ РЕЙЛ: връзка + статус ================= -->
+  <aside class="rail">
+    <div class="brand">
+      <div class="brand__mark"><span>BW</span></div>
+      <div>
+        <div class="brand__name">TikBVW</div>
+        <div class="brand__tag">Live Control Room</div>
+      </div>
+    </div>
+
+    <div class="panel status-block">
+      <div class="panel__title">Връзка</div>
+      <div class="tally" id="tally">
+        <div class="tally__dot"></div>
+        <div class="tally__label" id="tallyLabel">ИЗЧАКВАНЕ</div>
+      </div>
+
+      <div class="field">
+        <label for="usernameInput">TikTok потребителско име</label>
+        <input type="text" id="usernameInput" placeholder="напр. officialgeilegisela" />
+      </div>
+      <div class="btn-row">
+        <button class="primary" id="connectBtn" style="flex:1">Свържи се</button>
+        <button class="danger" id="disconnectBtn" style="flex:1">Прекъсни</button>
+      </div>
+      <div class="muted" id="roomInfo" style="margin-top:4px;"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel__title">На живо</div>
+      <div class="row">
+        <span class="readout" id="viewerCount">0<small>зрители</small></span>
+        <span class="readout" id="likeCount">0<small>лайкове</small></span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel__title">Overlay за OBS</div>
+      <p class="muted">Добави като Browser Source в OBS / TikTok Live Studio:</p>
+      <div class="overlay-link" id="overlayLink">/overlay.html</div>
+    </div>
+
+    <div class="panel" style="margin-top:auto;">
+      <div class="panel__title">Говорител (Piper TTS)</div>
+      <div class="row">
+        <div class="vu" id="vuMeter"><span></span><span></span><span></span><span></span><span></span></div>
+        <span class="tag" id="voiceTag">bg_BG-dimitar-medium</span>
+      </div>
+      <div class="muted" id="voiceStatusMsg" style="margin-top:8px;"></div>
+    </div>
+  </aside>
+
+  <!-- ================= ЦЕНТЪР: лента със събития ================= -->
+  <main class="main">
+    <div class="row">
+      <div>
+        <div class="panel__title" style="margin:0;">Лента на събитията</div>
+      </div>
+      <button id="clearFeedBtn">Изчисти лентата</button>
+    </div>
+    <div class="panel" style="flex:1; display:flex; flex-direction:column; min-height: 0;">
+      <div class="feed" id="feed"></div>
+    </div>
+  </main>
+
+  <!-- ================= ДЕСЕН РЕЙЛ: настройки TTS ================= -->
+  <aside class="rail right">
+    <div class="panel">
+      <div class="panel__title">Текст-към-говор</div>
+
+      <div class="toggle-row">
+        <span>Включен TTS</span>
+        <label class="switch"><input type="checkbox" id="ttsEnabled" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span>Чете чат съобщения</span>
+        <label class="switch"><input type="checkbox" id="readChat" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span>Чете подаръци</span>
+        <label class="switch"><input type="checkbox" id="readGifts" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span>Чете следвания</span>
+        <label class="switch"><input type="checkbox" id="readFollows" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span>Чете споделяния</span>
+        <label class="switch"><input type="checkbox" id="readShares"><span class="slider"></span></label>
+      </div>
+
+      <div class="field" style="margin-top:12px;">
+        <label>Скорост на говор: <span id="speedVal">1.0×</span></label>
+        <input type="range" id="speedRange" min="0.6" max="1.8" step="0.1" value="1.0" />
+      </div>
+
+      <div class="field">
+        <label>Минимум монети за озвучаване на подарък</label>
+        <input type="number" id="minGiftCoins" min="0" value="1" />
+      </div>
+
+      <div class="field">
+        <label>Черен списък (думи, разделени със запетая)</label>
+        <textarea id="blacklistWords" rows="2" placeholder="дума1, дума2"></textarea>
+      </div>
+
+      <div class="btn-row">
+        <button class="primary" id="saveSettingsBtn" style="flex:1">Запази настройките</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel__title">Тест на говорителя</div>
+      <div class="field">
+        <textarea id="testText" rows="2">Здравейте, това е тест на ТикБВВ.</textarea>
+      </div>
+      <button id="testTtsBtn" style="width:100%;">Изговори текста</button>
+    </div>
+  </aside>
+
+</div>
+
+<audio id="ttsPlayer" style="display:none;"></audio>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/dashboard.js"></script>
+</body>
+</html>
