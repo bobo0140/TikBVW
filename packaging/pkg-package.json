@@ -1,0 +1,9 @@
+{
+  "name": "tikbvw",
+  "version": "1.0.0",
+  "bin": "bundle.cjs",
+  "pkg": {
+    "assets": ["public/**/*"],
+    "targets": ["node22-win-x64"]
+  }
+}
