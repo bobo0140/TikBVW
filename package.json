@@ -4,15 +4,30 @@
   "description": "TikBVW – собствена алтернатива на TikFinity за TikTok LIVE: чат, подаръци, следвания и TTS с Piper (bg_BG-dimitar-medium).",
   "type": "module",
   "main": "server.js",
+  "bin": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "build:win": "pkg . --targets node18-win-x64 --output dist/TikBVW.exe"
   },
   "license": "MIT",
   "dependencies": {
     "express": "^4.19.2",
+    "nanoid": "^5.0.7",
     "socket.io": "^4.7.5",
-    "tiktok-live-connector": "^2.0.4",
-    "nanoid": "^5.0.7"
+    "tiktok-live-connector": "^2.0.4"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.22.0",
+    "esbuild": "^0.28.2"
+  },
+  "pkg": {
+    "assets": [
+      "public/**/*"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "dist"
   }
 }

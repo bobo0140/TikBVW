@@ -3,13 +3,27 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { exec } from 'child_process';
 
 import { loadConfig, saveConfig } from './src/configManager.js';
 import { tiktokManager } from './src/tiktokManager.js';
 import { ttsEngine } from './src/ttsEngine.js';
+import { isPackaged } from './src/appPaths.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = typeof __filename !== 'undefined'
+  ? path.dirname(__filename)
+  : path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
+
+function openInBrowser(url) {
+  const platform = process.platform;
+  const cmd = platform === 'win32'
+    ? `start "" "${url}"`
+    : platform === 'darwin'
+      ? `open "${url}"`
+      : `xdg-open "${url}"`;
+  exec(cmd, () => {}); // тихо игнорираме грешки (напр. няма графична среда)
+}
 
 const app = express();
 app.use(express.json());
@@ -135,14 +149,33 @@ io.on('connection', (socket) => {
 });
 
 httpServer.listen(PORT, () => {
-  console.log(`\n  TikBVW сървър работи на http://localhost:${PORT}`);
-  console.log(`  Overlay за OBS: http://localhost:${PORT}/overlay.html\n`);
+  const url = `http://localhost:${PORT}`;
+  console.log('  ████████╗██╗██╗  ██╗██████╗ ██╗    ██╗██╗    ██╗');
+  console.log('  ╚══██╔══╝██║██║ ██╔╝██╔══██╗██║    ██║██║    ██║');
+  console.log('     ██║   ██║█████╔╝ ██████╔╝██║ █╗ ██║██║ █╗ ██║');
+  console.log('     ██║   ██║██╔═██╗ ██╔══██╗██║███╗██║██║███╗██║');
+  console.log('     ██║   ██║██║  ██╗██████╔╝╚███╔███╔╝╚███╔███╔╝');
+  console.log('     ╚═╝   ╚═╝╚═╝  ╚═╝╚═════╝  ╚══╝╚══╝  ╚══╝╚══╝ \n');
+  console.log(`  Контролна зала:  ${url}`);
+  console.log(`  Overlay за OBS:  ${url}/overlay.html\n`);
+
   const voiceStatus = ttsEngine.checkVoiceReady(config.tts.voice);
   if (!voiceStatus.ready) {
-    console.warn('  [!] Piper TTS не е напълно конфигуриран:');
+    console.warn('  [!] Говорителят (Piper TTS) не е напълно готов:');
     if (!voiceStatus.piperExists) console.warn(`      - липсва piper бинарник в ${voiceStatus.piperPath}`);
     if (!voiceStatus.modelExists) console.warn(`      - липсва модел ${voiceStatus.modelPath}`);
     if (!voiceStatus.configExists) console.warn(`      - липсва конфиг ${voiceStatus.configPath}`);
-    console.warn('      Виж README.md за инструкции.\n');
+    console.warn('      Сложи гласовите файлове в папка voices/ до TikBVW.exe и рестартирай.\n');
+  } else {
+    console.log('  Говорителят (Piper TTS) е зареден и готов.\n');
   }
+
+  if (isPackaged() || process.env.TIKBVW_AUTO_OPEN === '1') {
+    console.log('  Отварям контролната зала в браузъра...\n');
+    setTimeout(() => openInBrowser(url), 600);
+  }
+
+  console.log('  Затвори този прозорец, за да спреш TikBVW.\n');
 });
+
+process.on('SIGINT', () => process.exit(0));

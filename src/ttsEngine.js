@@ -2,12 +2,11 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { EventEmitter } from 'events';
 import { nanoid } from 'nanoid';
+import { getAppRoot } from './appPaths.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(__dirname, '..');
+const ROOT = getAppRoot();
 
 // Позволява override чрез environment променливи, ако piper/моделите са другаде
 const PIPER_BIN = process.env.PIPER_PATH || path.join(ROOT, 'piper', process.platform === 'win32' ? 'piper.exe' : 'piper');

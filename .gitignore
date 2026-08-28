@@ -7,3 +7,8 @@ data/config.json
 # Гласови модели - потребителят ги добавя ръчно (виж README)
 voices/*.onnx
 voices/*.onnx.json
+
+# Build артефакти - не влизат в git, генерират се локално
+bundle.cjs
+dist-build/
+dist/
