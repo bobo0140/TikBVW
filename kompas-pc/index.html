@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BVG Компас</title>
+<style>
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent}
+  canvas{display:block;width:100%;height:100%}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+/*  BVG Компас – радар със златна рамка за TikTok LIVE Studio (източник "Линк")
+    Лъчът постоянно търси наляво-надясно, вълните пулсират, но никога не намира нищо.
+
+    Параметри след адреса, напр.  .../kompas/?speed=1.5
+      ping=0  = без белите вълни от центъра
+      lang=bg = С И Ю З вместо N E S W
+      speed   = скорост от 0.3 до 3 (по подразбиране 1)
+      cam=1   = лъчът следи как мърдаш пред камерата (само ако камерата е свободна)
+      test=1  = цветен фон, само за проба
+
+    Десктоп режим: ако на компютъра е пусната BVG-Kompas.exe, страницата се свързва с нея сама
+      и лъчът следи мишката ти, а W A S D го насочват напред/наляво/назад/надясно.
+      Ако програмата не е пусната, компасът просто търси сам.
+      live=0     = не се свързва с програмата
+      port=7788  = порт на програмата (ако е друг)
+      sens=0.04  = колко силно реагира на мишката
+      invert=1   = обръща посоката на мишката
+      idle=4     = след колко секунди без движение пак започва да търси сам (0 = никога)
+*/
+(function(){
+const P=new URLSearchParams(location.search);
+const NAMES=(P.get('lang')||'').toLowerCase()==='bg'?['С','И','Ю','З']:['N','E','S','W'];
+const SPEED=Math.min(3,Math.max(0.3,parseFloat(P.get('speed'))||1));
+const CAM=P.get('cam')==='1';
+const PING=P.get('ping')!=='0';
+const LIVE=P.get('live')!=='0';
+const SAME=location.protocol==='http:'&&/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+const SENS=(parseFloat(P.get('sens'))||0.04)*(P.get('invert')==='1'?-1:1);
+const IDLE=P.has('idle')?Math.max(0,parseFloat(P.get('idle'))||0):4;
+if(P.get('test')==='1')document.body.style.background='linear-gradient(135deg,#c9a6b8,#7d86b8 60%,#4b5a8c)';
+const SERIF='"Times New Roman",Times,"Liberation Serif",Georgia,serif';
+const TAU=Math.PI*2,DEG=Math.PI/180;
+
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let cw=1,ch=1,dpr=1,R=1,cx=0,cy=0,bgL=null,fgL=null,beamG=null;
+
+function circle(x,X,Y,r){x.beginPath();x.arc(X,Y,r,0,TAU);}
+function ring(x,ro,ri){x.beginPath();x.arc(cx,cy,ro,0,TAU);x.arc(cx,cy,ri,0,TAU,true);}
+function layer(fn){
+  const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;
+  const x=c.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);fn(x);return c;
+}
+
+/* ---------- циферблатът (тъмносин, със слаби кръгове) ---------- */
+function drawFace(x){
+  const F=R*0.868;
+  const g=x.createRadialGradient(cx,cy,0,cx,cy,F);
+  g.addColorStop(0,'#283b4d');g.addColorStop(0.35,'#1f3245');g.addColorStop(0.7,'#152536');g.addColorStop(1,'#0d1723');
+  x.fillStyle=g;circle(x,cx,cy,F);x.fill();
+  x.strokeStyle='rgba(150,180,215,0.075)';x.lineWidth=Math.max(1,R*0.006);
+  [0.22,0.46,0.7].forEach(r=>{circle(x,cx,cy,R*r);x.stroke();});
+  x.strokeStyle='rgba(150,180,215,0.05)';
+  x.beginPath();x.moveTo(cx-F,cy);x.lineTo(cx+F,cy);x.moveTo(cx,cy-F);x.lineTo(cx,cy+F);x.stroke();
+}
+
+/* ---------- златната рамка, чертичките, буквите, украшението горе ---------- */
+function drawRim(x){
+  // сянка под рамката
+  x.save();x.shadowColor='rgba(0,0,0,0.4)';x.shadowBlur=R*0.03;
+  x.fillStyle='#d8902f';ring(x,R,R*0.86);x.fill();
+  x.restore();
+  // външен оранжев ръб със светла линия
+  let g=x.createLinearGradient(cx-R,cy-R,cx+R,cy+R);
+  g.addColorStop(0,'#f4bd4c');g.addColorStop(0.5,'#dc9a2c');g.addColorStop(1,'#bf7c18');
+  x.fillStyle=g;ring(x,R,R*0.968);x.fill();
+  x.strokeStyle='#ffd27a';x.lineWidth=Math.max(1,R*0.011);circle(x,cx,cy,R*0.977);x.stroke();
+  x.fillStyle='#6b4607';ring(x,R*0.968,R*0.955);x.fill();
+  // светлозлатната лента с назъбването
+  g=x.createLinearGradient(cx-R,cy-R,cx+R,cy+R);
+  g.addColorStop(0,'#fff0a6');g.addColorStop(0.35,'#fcdb88');g.addColorStop(0.7,'#f5cd72');g.addColorStop(1,'#e2b45a');
+  x.fillStyle=g;ring(x,R*0.955,R*0.906);x.fill();
+  x.fillStyle='rgba(140,104,40,0.72)';
+  const bw=R*0.012,bh=R*0.027;
+  for(let a=0;a<360;a+=1.6){
+    x.save();x.translate(cx,cy);x.rotate(a*DEG);x.fillRect(-bw/2,-R*0.9305-bh/2,bw,bh);x.restore();
+  }
+  // тъмен кант, черен процеп, сребърна линия
+  x.fillStyle='#7a5a2c';ring(x,R*0.906,R*0.898);x.fill();
+  x.fillStyle='#060305';ring(x,R*0.898,R*0.866);x.fill();
+  x.strokeStyle='#a3abb0';x.lineWidth=Math.max(1.2,R*0.011);circle(x,cx,cy,R*0.862);x.stroke();
+  // чертички на всеки 30°
+  x.strokeStyle='rgba(236,241,246,0.92)';x.lineWidth=Math.max(1.5,R*0.009);x.lineCap='butt';
+  for(let a=0;a<360;a+=30){
+    const s=Math.sin(a*DEG),c=-Math.cos(a*DEG);
+    x.beginPath();x.moveTo(cx+s*R*0.862,cy+c*R*0.862);x.lineTo(cx+s*R*0.812,cy+c*R*0.812);x.stroke();
+  }
+  // буквите N E S W
+  x.font=`bold ${R*0.105}px ${SERIF}`;x.textAlign='center';x.textBaseline='middle';
+  x.shadowColor='rgba(0,0,0,0.6)';x.shadowBlur=R*0.012;x.fillStyle='#f6f8fa';
+  const lr=R*0.715;
+  x.fillText(NAMES[0],cx,cy-lr+R*0.006);
+  x.fillText(NAMES[1],cx+lr,cy+R*0.006);
+  x.fillText(NAMES[2],cx,cy+lr+R*0.006);
+  x.fillText(NAMES[3],cx-lr,cy+R*0.006);
+  x.shadowColor='transparent';x.shadowBlur=0;
+  // златното украшение най-горе
+  const top=cy-R*0.962;
+  g=x.createLinearGradient(cx-R*0.03,top,cx+R*0.03,top+R*0.1);
+  g.addColorStop(0,'#fff3b0');g.addColorStop(0.5,'#f2c247');g.addColorStop(1,'#b8740f');
+  x.fillStyle=g;x.strokeStyle='#6e440a';x.lineWidth=Math.max(1,R*0.004);
+  x.beginPath();
+  x.moveTo(cx,top);
+  x.bezierCurveTo(cx+R*0.03,top+R*0.02,cx+R*0.02,top+R*0.05,cx,top+R*0.09);
+  x.bezierCurveTo(cx-R*0.02,top+R*0.05,cx-R*0.03,top+R*0.02,cx,top);
+  x.closePath();x.fill();x.stroke();
+  x.fillStyle='#fff6c8';circle(x,cx,top+R*0.03,R*0.009);x.fill();
+  x.strokeStyle='#e9b43c';x.lineWidth=Math.max(1,R*0.006);
+  x.beginPath();x.moveTo(cx,top+R*0.09);x.lineTo(cx,cy-R*0.835);x.stroke();
+}
+
+/* ---------- лъчът: гладък конус, рисуван веднъж и после само въртян ---------- */
+function makeBeam(){
+  const F=R*0.866,S=Math.max(2,Math.ceil(2*F*dpr));
+  const c=document.createElement('canvas');c.width=S;c.height=S;
+  const x=c.getContext('2d'),img=x.createImageData(S,S),d=img.data;
+  const half=S/2;
+  for(let py=0;py<S;py++){
+    const y=(py+0.5-half)/half;
+    for(let px=0;px<S;px++){
+      const xx=(px+0.5-half)/half,r=Math.sqrt(xx*xx+y*y);
+      if(r>1||y>0.05)continue;
+      const ang=Math.abs(Math.atan2(xx,-y))/DEG;
+      if(ang>27)continue;
+      let aA=1;if(ang>11){const t=(ang-11)/16;aA=1-t*t*(3-2*t);}
+      let aR=r<0.07?r/0.07:1-0.38*(r-0.07)/0.93;
+      if(r>0.94)aR*=(1-r)/0.06;
+      const a=0.32*aA*aR;
+      const i=(py*S+px)*4;
+      d[i]=205;d[i+1]=220;d[i+2]=236;d[i+3]=Math.round(a*255);
+    }
+  }
+  x.putImageData(img,0,0);
+  return c;
+}
+
+function resize(){
+  dpr=window.devicePixelRatio||1;cw=innerWidth||1;ch=innerHeight||1;
+  cv.width=Math.round(cw*dpr);cv.height=Math.round(ch*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
+  R=Math.min(cw,ch)/2*0.97;cx=cw/2;cy=ch/2;
+  bgL=layer(drawFace);fgL=layer(drawRim);beamG=makeBeam();
+}
+addEventListener('resize',resize);resize();
+
+const rand=(a,b)=>a+Math.random()*(b-a);
+const sgn=()=>Math.random()<0.5?-1:1;
+
+/* ---------- движение на лъча: винаги търси, никога не намира ---------- */
+let h=rand(0,360),v=0,base=h,target=h,tm=0;
+let mode='spin',mT=0,mDur=2.5,A=40,W=1.2,pt=0,jerk=0,spinDir=1,spinV=110;
+
+function nextMode(){
+  mT=0;
+  if(mode==='almost'){                 // почти намери... и рязко се отказва
+    base=pt+sgn()*rand(50,130);jerk=0.7;
+    mode='sweep';A=rand(25,60);W=rand(1,1.8);mDur=rand(2,4);return;
+  }
+  const r=Math.random();
+  if(r<0.32){mode='spin';base=h;spinDir=Math.random()<0.7?1:-1;spinV=rand(70,140);mDur=rand(1.5,4);}   // върти се като в играта
+  else if(r<0.6){mode='sweep';base=h;A=rand(20,75);W=rand(0.7,1.9);mDur=rand(2.5,5.5);}               // оглежда наляво-надясно
+  else if(r<0.75){mode='turn';base=h+sgn()*rand(50,170);mDur=rand(1.2,2.2);}                            // рязко завъртане
+  else if(r<0.9){mode='almost';pt=h+rand(-70,70);mDur=rand(2.2,3.6);}                                  // успокоява се към една посока
+  else{mode='jitter';base=h;mDur=rand(1,2);}                                                           // нервно потрепване
+}
+
+let camX=0,camBase=0,camActive=false,lastMove=-1e9;
+
+/* ---------- десктоп режим: мишка + W A S D от BVG-Kompas.exe ---------- */
+let inputMode=false,yaw=0,off=0,offV=0,walkAmt=0,keys=0,inX=null,lastInput=-1e9;
+function onInput(){
+  if(!inputMode){inputMode=true;yaw=h-off;jerk=0;}
+  lastInput=performance.now();
+}
+let linked=false;
+if(LIVE&&typeof EventSource!=='undefined'){
+  // връзка с BVG-Kompas.exe – от https линка към http://127.0.0.1 на същия компютър
+  const ports=P.get('port')?[parseInt(P.get('port'),10)]:[7788,7789,7790,7791];
+  let pi=0,es=null,ever=false;
+  const connect=()=>{
+    const url=SAME?'/events':'http://127.0.0.1:'+ports[pi]+'/events';
+    try{es=new EventSource(url);}catch(_){setTimeout(connect,2000);return;}
+    es.onopen=()=>{linked=true;ever=true;inX=null;};
+    es.onmessage=e=>{
+      let d;try{d=JSON.parse(e.data);}catch(_){return;}
+      if(inX!==null&&d.x!==inX){onInput();yaw+=(d.x-inX)*SENS;}
+      inX=d.x;
+      if(d.k)onInput();
+      keys=d.k|0;
+    };
+    es.onerror=()=>{
+      linked=false;keys=0;inX=null;
+      if(es.readyState===2||!ever){        // програмата не е пусната – пробвай пак след малко
+        es.close();
+        if(!ever&&!SAME)pi=(pi+1)%ports.length;
+        setTimeout(connect,ever?1000:2000);
+      }
+    };
+  };
+  connect();
+}
+window.__kompas=()=>({live:LIVE,linked,inputMode,keys,heading:Math.round(((h%360)+360)%360)});
+
+function step(dt){
+  tm+=dt;mT+=dt;
+  let k=6,tremor=1;
+  if(inputMode&&IDLE>0&&keys===0&&performance.now()-lastInput>IDLE*1000){inputMode=false;mode='jitter';nextMode();}
+  // W A S D насочват лъча: W напред, D надясно, A наляво, S назад
+  const mx=((keys&8)?1:0)-((keys&2)?1:0),my=((keys&1)?1:0)-((keys&4)?1:0),walking=mx!==0||my!==0;
+  const offT=walking?Math.atan2(mx,my)/DEG:0;
+  const dO=(((offT-off)%360)+540)%360-180;
+  offV+=(70*dO-2*Math.sqrt(70)*0.85*offV)*dt;off+=offV*dt;
+  walkAmt+=((walking?1:0)-walkAmt)*Math.min(1,dt*6);
+  const moving=CAM&&performance.now()-lastMove<1200;
+  if(inputMode){
+    target=yaw+off+2.5*walkAmt*Math.sin(tm*10);k=90;tremor=0.35;   // следи мишката и стъпките
+  }else if(moving){
+    if(!camActive){camActive=true;camBase=h-camX*80;}
+    target=camBase+camX*80;k=8;
+  }else{
+    if(camActive){camActive=false;mode='jitter';nextMode();}
+    if(mT>mDur)nextMode();
+    if(mode==='spin'){target=base+spinDir*spinV*mT;}
+    else if(mode==='sweep'){target=base+A*Math.min(1,mT/0.8)*Math.sin(W*2*mT);}
+    else if(mode==='turn'){target=base;k=9;}
+    else if(mode==='almost'){const a=24*Math.exp(-mT*1.2)+1.8;target=pt+a*Math.sin(mT*6.5);k=8;}
+    else{target=base+7*Math.sin(mT*9)+4*Math.sin(mT*14.3);k=12;}
+  }
+  if(jerk>0){jerk-=dt;k=22;}
+  target+=tremor*(1.6*Math.sin(tm*3.1)+1.1*Math.sin(tm*5.7+1)+0.6*Math.sin(tm*11.3+2));  // никога не застива
+  const c=2*Math.sqrt(k)*(inputMode?0.9:0.6);
+  v+=(k*(target-h)-c*v)*dt;h+=v*dt;
+}
+
+/* ---------- по желание: следене на движението през камерата ---------- */
+async function initCam(){
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({video:{width:160,height:120},audio:false});
+    const vd=document.createElement('video');vd.muted=true;vd.playsInline=true;vd.srcObject=s;await vd.play();
+    const sc=document.createElement('canvas');sc.width=64;sc.height=48;
+    const sx=sc.getContext('2d',{willReadFrequently:true});
+    let prev=null;
+    setInterval(()=>{
+      if(vd.readyState<2)return;
+      sx.drawImage(vd,0,0,64,48);
+      const d=sx.getImageData(0,0,64,48).data,g=new Uint8Array(3072);
+      for(let i=0,j=0;j<3072;i+=4,j++)g[j]=(d[i]*3+d[i+1]*4+d[i+2])>>3;
+      if(prev){
+        let n=0,sum=0;
+        for(let j=0;j<3072;j++)if(Math.abs(g[j]-prev[j])>28){n++;sum+=j&63;}
+        if(n>45){const x=1-(sum/n)/31.5;camX+=(x-camX)*0.3;lastMove=performance.now();}
+      }
+      prev=g;
+    },66);
+  }catch(e){/* камерата е заета или забранена – остава автоматичното търсене */}
+}
+if(CAM)initCam();
+
+/* ---------- кадър ---------- */
+let pingT=0.4;
+function drawBeam(){
+  const F=R*0.866;
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(h*DEG);
+  ctx.drawImage(beamG,-F,-F,2*F,2*F);
+  ctx.restore();
+}
+function drawPing(){
+  const p=pingT/0.95;
+  if(p>=1)return;
+  const e=1-Math.pow(1-p,2),a=0.9*Math.pow(1-p,1.3);
+  ctx.strokeStyle=`rgba(226,237,249,${a})`;ctx.lineWidth=Math.max(1.2,R*0.011);
+  circle(ctx,cx,cy,R*(0.1+0.6*e));ctx.stroke();
+}
+function drawCenter(){
+  ctx.save();ctx.shadowColor='rgba(255,255,255,0.9)';ctx.shadowBlur=R*0.03;
+  ctx.fillStyle='#ffffff';circle(ctx,cx,cy,R*0.021);ctx.fill();ctx.restore();
+}
+
+let last=performance.now();
+function frame(now){
+  let dt=Math.min(0.1,Math.max(0,(now-last)/1000))*SPEED;last=now;
+  pingT+=dt;if(pingT>2.4)pingT-=2.4;
+  while(dt>0){const s=Math.min(dt,1/120);step(s);dt-=s;}
+  ctx.clearRect(0,0,cw,ch);
+  ctx.drawImage(bgL,0,0,cw,ch);
+  drawBeam();
+  if(PING)drawPing();
+  drawCenter();
+  ctx.drawImage(fgL,0,0,cw,ch);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
